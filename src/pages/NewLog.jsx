@@ -4,9 +4,11 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import { Link } from 'react-router-dom';
+import { supabase } from '../utils/supabaseClient';
 
 export default function NewLog() {
   const navigate = useNavigate();
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     shipped: '',
@@ -42,12 +44,39 @@ export default function NewLog() {
     }
   };
 
-  const handleSave = () => {
-    const saved = localStorage.getItem('skill_logs');
-    const logs = saved ? JSON.parse(saved) : [];
-    logs.push({ ...formData, id: Date.now() });
-    localStorage.setItem('skill_logs', JSON.stringify(logs));
-    navigate('/');
+  const handleSave = async () => {
+    setIsSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      alert("You must be logged in to save logs.");
+      setIsSaving(false);
+      return;
+    }
+
+    const payload = {
+      user_id: session.user.id,
+      date: formData.date,
+      shipped: formData.shipped,
+      technical_work: formData.technicalWork,
+      struggles: formData.struggles,
+      metrics: formData.metrics,
+      delta: {
+        before: formData.deltaBefore,
+        after: formData.deltaAfter,
+        proof: formData.deltaProof
+      }
+    };
+
+    const { error } = await supabase.from('skill_logs').insert([payload]);
+
+    if (!error) {
+      navigate('/');
+    } else {
+      console.error("Error saving log:", error);
+      alert("Failed to save log: " + error.message);
+      setIsSaving(false);
+    }
   };
 
   return (

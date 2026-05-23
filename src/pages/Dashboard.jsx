@@ -4,17 +4,35 @@ import { PlusCircle, Activity, BookOpen, Target, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import { Link } from 'react-router-dom';
+import { supabase } from '../utils/supabaseClient';
 
 export default function Dashboard() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    // Load from local storage for now
-    const saved = localStorage.getItem('skill_logs');
-    if (saved) {
-      setLogs(JSON.parse(saved));
-    }
+    fetchLogs();
+
+    const channel = supabase.channel('public:skill_logs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_logs' }, payload => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  const fetchLogs = async () => {
+    const { data, error } = await supabase
+      .from('skill_logs')
+      .select('*')
+      .order('date', { ascending: false });
+      
+    if (!error && data) {
+      setLogs(data);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-6xl space-y-8">
